@@ -64,111 +64,104 @@ def check_for_config_file(config_file, def_delay, def_photo_folder):
 
 def run_photo_frame(params):
 
-    # grab our parameters that control operation of the
-    configfn    = params[0]   # name of config file to look for in top level folder 
-    delay       = params[1]   # delay in seconds to show each picture
-    photoFolder = params[2]   # be real careful when changing this in config file
-    
-    # determine if this is a windows OS based system
-    IS_WINDOWS = sys.platform.startswith('win') # 'win32' or 'linux2' or 'linux'
-
-    # initialize a CV2 frame to cover the entire screen
-    cv2frame = 'frame'
-    cv2.namedWindow(cv2frame, cv2.WINDOW_NORMAL)
-    cv2.setWindowProperty(cv2frame, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-
-    # let's find out what size of display we're working with    
-    tmp = cv2.getWindowImageRect(cv2frame)
-    wid = float(tmp[2])
-    hgt = float(tmp[3])
-    # sometimes the getWindowImageRect returns nonsense like
-    # width or height of -1 or some other non useful value
-    if hgt<480.0 or wid<640.0:
-        hgt=1080.0 # assume a 9h x 16w form factor
-        wid=1920.0
-    #print(hgt,wid)
-    
-    # Scan the photo folder for a list of picture files
-    pictureFiles=scan_for_files(photoFolder)
-    print(datetime.datetime.now(), 'Scan found', len(pictureFiles), 'files')
-
-    # initialize for hourly and sleep processing    
-    done = False
-    last_hour = -1 # Force a reset on first iteration (for code testing)
+    config_file_name    = params[0]
+    delay               = params[1]
+    photo_folder        = params[2]
 
     # Force screen to remain on and not blank
+    IS_WINDOWS = sys.platform.startswith('win') # 'win32' or 'linux2' or 'linux'
     if not IS_WINDOWS:
         os.system("xset dpms force on")
         os.system("xset s off")
+
+    # Initialize a CV2 frame to cover the entire screen
+    cv2_frame = 'frame'
+    cv2.namedWindow(cv2_frame, cv2.WINDOW_NORMAL)
+    cv2.setWindowProperty(cv2_frame, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+    # Find out what size of display we're working with, handle potential non-sense
+    tmp = cv2.getWindowImageRect(cv2_frame)
+    window_width = float(tmp[2])
+    window_height = float(tmp[3])
+    if window_height < 480.0 or window_width < 640.0:
+        window_height = 1080.0
+        window_width = 1920.0
+    #print(window_height, window_height)
     
-    # and loop forever (until some key is hit)
+    # Scan the photo folder for a list of picture files
+    picture_file_list = scan_for_files(photo_folder)
+    print(datetime.datetime.now(), 'Scan found', len(picture_file_list), 'files')
+
+    current_index   = 0     # Photo index to use
+    done            = False
+    last_hour       = -1    # Force a reset on first iteration (for code testing)
+    
     while not done:
-        for fn in pictureFiles:
 
-            # Hourly reconfiguration
-            current_hour = datetime.datetime.now().hour       
-            if current_hour is not last_hour:
-                last_hour = current_hour
+        # Hourly reconfiguration
+        current_hour = datetime.datetime.now().hour       
+        if current_hour is not last_hour:
+            last_hour = current_hour
 
-                result = check_for_config_file(configfn, delay, photoFolder)
-                if result[0] == True:
-                    delay = result[1]
-                    photoFolder = result[2]
-                
-                pictureFiles = scan_for_files(photoFolder)
-                print(datetime.datetime.now(), 'Scan found', len(pictureFiles), 'files')
+            result = check_for_config_file(config_file_name, delay, photo_folder)
+            if result[0] == True:
+                delay = result[1]
+                photo_folder = result[2]
+            
+            picture_file_list = scan_for_files(photo_folder)
+            print(datetime.datetime.now(), 'Scan found', len(picture_file_list), 'files')
 
-            #--- display a photo
-            gotImg=False
-            try:
-                print('loading', fn)
-                date = int(fn[-19:-11]) # Gets date code to forward to the screen
-                img = cv2.imread(fn, 1)
-                if len(img) > 0:
-                    gotImg = True
-            except:
-                gotImg = False
-            if not gotImg:
-                continue
+        # Select new photo
+        current_index = current_index + 1 # Just increment for now
+        if current_index >= len(picture_file_list):
+            current_index = 0 
+        file_name = picture_file_list[current_index]
 
-            #-- now, maybe resize image so it shows up well without changing the aspect ratio
-            #   add a border if the aspect ratio is different than the screen
-            # so we upscale or downscale so it maxes out either the
-            # horizontal or vertical portion of the screen
-            # then add a border around it to make sure any left-over
-            # parts of the screen are blacked out
-            widratio = wid / img.shape[1]
-            hgtratio = hgt / img.shape[0]
-            ratio = min(widratio,hgtratio)
-            dims = (int(ratio * img.shape[1]), int(ratio * img.shape[0]))
-            #print(fn, img.shape, ratio, dims[1], dims[0])
-            imgresized = cv2.resize(img, dims, interpolation = cv2.INTER_AREA)
-            #print(imgresized.shape)
-            # now, one dimension (width or height) will be same as screen dim
-            # and the other may be smaller than the screen dim.
-            # we're going to use cv.copyMakeBorder to add a border so we
-            # end up with an image that is exactly screen sized
-            widborder = max(1, int((wid-imgresized.shape[1]) / 2))
-            hgtborder = max(1, int((hgt-imgresized.shape[0]) / 2))
-            #print(hgtborder,widborder)
-            imgbordered = cv2.copyMakeBorder(imgresized, hgtborder, hgtborder, widborder, widborder, cv2.BORDER_CONSTANT)
-            #print('resized,bordered', imgbordered.shape)
+        got_image=False
+        try:
+            # print('Showing', file_name)
+            date = int(file_name[-19:-11]) # Gets date code to forward to the screen
+            image = cv2.imread(file_name, 1)
+            if len(image) > 0:
+                got_image = True
+        except:
+            got_image = False
+        if not got_image:
+            continue
 
-            # and now show the image that has been resized and bordered
-            cv2.imshow(cv2frame, imgbordered)
-            #--- now we pause while the photo is displayed, we do this
-            #    by waiting for a key stroke.
-            k = cv2.waitKey(int(delay * 1000)) & 0xff
+        #-- now, maybe resize image so it shows up well without changing the aspect ratio
+        #   add a border if the aspect ratio is different than the screen
+        # so we upscale or downscale so it maxes out either the
+        # horizontal or vertical portion of the screen
+        # then add a border around it to make sure any left-over
+        # parts of the screen are blacked out
+        width_ratio = window_width / image.shape[1]
+        height_ratio = window_height / image.shape[0]
+        ratio = min(width_ratio,height_ratio)
+        dimensions = (int(ratio * image.shape[1]), int(ratio * image.shape[0]))
+        #print(fn, img.shape, ratio, dims[1], dims[0])
+        imgresized = cv2.resize(image, dimensions, interpolation = cv2.INTER_AREA)
+        #print(imgresized.shape)
+        # now, one dimension (width or height) will be same as screen dim
+        # and the other may be smaller than the screen dim.
+        # we're going to use cv.copyMakeBorder to add a border so we
+        # end up with an image that is exactly screen sized
+        width_border = max(1, int((window_width-imgresized.shape[1]) / 2))
+        height_border = max(1, int((window_height-imgresized.shape[0]) / 2))
+        #print(hgtborder,widborder)
+        bordered_image = cv2.copyMakeBorder(imgresized, height_border, height_border, width_border, width_border, cv2.BORDER_CONSTANT)
+        #print('resized,bordered', imgbordered.shape)
 
-            if k != 255:
-                # if a key was pressed, exit the photo frame program
-                done = True
-                break  
+        # Show final image while waiting for a key to potentially be pressed for exit
+        cv2.imshow(cv2_frame, bordered_image)
+        k = cv2.waitKey(int(delay * 1000)) & 0xff
+
+        if k != 255: # Any key pressed
+            done = True
+            break
   
-    # when the photo display session ends, 
-    # we need to clean up the cv2 full-frame window
-    cv2.destroyWindow(cv2frame)
-
+    # Once the photo display session ends clean up the full-frame window
+    cv2.destroyWindow(cv2_frame)
 
 
 if __name__ == "__main__":
