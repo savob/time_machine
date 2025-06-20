@@ -19,6 +19,7 @@ def scan_for_files(folder):
             x = scan_for_files(entry.path)
             picture_files.extend(x)
     #itr.close()
+    picture_files.sort()
     return picture_files
 
 def check_for_config_file(config_file, def_delay, def_photo_folder):
@@ -37,28 +38,27 @@ def check_for_config_file(config_file, def_delay, def_photo_folder):
     #
 
     result = [False, def_delay, def_photo_folder]
-    readparams = 0 # bitwise log of keywords found to verify we had a full and correct read
+    params_read = 0 # bitwise log of keywords found to verify we had a full and correct read
     # print('Reading config from ' + config_file)
 
     try:
-        with open(config_file,'r') as finp:
+        with open(config_file, 'r') as finp:
             print(datetime.datetime.now(), 'Reading configuration file')
             for line in finp:
-                print(line)
                 if line.startswith('DELAY='):
                     x = float(line[6:])
                     x = max(1.,x)
                     x = min(60.,x) # limit 1..60
                     result[1] = x
-                    readparams = readparams | 1
+                    params_read = params_read | 1
                 if line.startswith('PATH='):
                     result[2] = line[5:-1] # strip off new line at end
-                    readparams = readparams | 2
+                    params_read = params_read | 2
     except:
         pass
 
-    print('Read configuration file results ',result)
-    if (readparams == 3):
+    # print('Read configuration file results ', result)
+    if (params_read == 3):
         result[0] = True # read file properly, all bits set
     return result
 
