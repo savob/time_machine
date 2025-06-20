@@ -122,6 +122,7 @@ def run_photo_frame(params):
             gotImg=False
             try:
                 print('loading', fn)
+                date = int(fn[-19:-11]) # Gets date code to forward to the screen
                 img = cv2.imread(fn, 1)
                 if len(img) > 0:
                     gotImg = True
