@@ -120,7 +120,6 @@ def run_photo_frame(params):
         got_image=False
         try:
             # print('Showing', file_name)
-            date = int(file_name[-19:-11]) # Gets date code to forward to the screen
             image = cv2.imread(file_name, 1)
             if len(image) > 0:
                 got_image = True
@@ -128,6 +127,11 @@ def run_photo_frame(params):
             got_image = False
         if not got_image:
             continue
+
+        # Extract time stamps to potentially send to the displays
+        date_and_time = os.path.basename(file_name)
+        date_stamp = int(date_and_time[0:8])
+        time_stamp = int(date_and_time[9:15])
 
         #-- now, maybe resize image so it shows up well without changing the aspect ratio
         #   add a border if the aspect ratio is different than the screen
