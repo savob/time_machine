@@ -194,4 +194,4 @@ cython_debug/
 .cursorindexingignore
 
 # Don't sync the media
-time_machine_photos/
+photos_to_show/
