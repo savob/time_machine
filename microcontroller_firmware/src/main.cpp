@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "TM1637.h"
+#include <USBKeyboard.h>
 
 #include "pin_allocations_pico.h"
 
@@ -35,6 +36,8 @@ EncoderState check_encoder() {
 TM1637 top_display(PIN_TOP_CLK, PIN_TOP_DIO);
 TM1637 bot_display(PIN_BOT_CLK, PIN_BOT_DIO);
 
+USBKeyboard keyboard_interface(true);
+
 void setup_display(TM1637* disp) {
 	disp->set(7); // Max brightness
 	disp->init();
@@ -60,11 +63,23 @@ void setup() {
 }
 
 void loop() {
-	digitalWrite(PIN_LED, HIGH);
-	delay(50);
-	digitalWrite(PIN_LED, LOW);
-	delay(50);
-
+	EncoderState state = check_encoder();
 	bot_display.displayNum(millis() % 10000);
-	top_display.displayNum(check_encoder());
+	top_display.displayNum(state);
+
+	switch (state) {
+	case ENCODER_SPIN_FWD:
+		keyboard_interface.key_code('f');
+		break;
+	case ENCODER_BUTTON_PRESS:
+		keyboard_interface.key_code('p');
+		break;
+	case ENCODER_SPIN_REV:
+		keyboard_interface.key_code('r');
+		break;
+	default:
+		break;
+	}
+
+	delay(10);
 }
