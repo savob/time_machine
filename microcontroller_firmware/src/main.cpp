@@ -11,8 +11,45 @@ typedef enum _EncoderState {
 	ENCODER_SPIN_REV,
 } EncoderState;
 
+TM1637 top_display(PIN_TOP_CLK, PIN_TOP_DIO);
+TM1637 bot_display(PIN_BOT_CLK, PIN_BOT_DIO);
+
+USBKeyboard keyboard_interface(true);
+
+volatile EncoderState turning_state = ENCODER_NO_INPUT;
+
+void encoder_interrupt() {
+	const unsigned long DEBOUNCE_MS = 40;
+	static unsigned long next_interrupt_ms = 0; // Mark next allowed edge event
+
+	unsigned long current_ms = millis();
+
+	if (current_ms < next_interrupt_ms) return;
+	next_interrupt_ms = current_ms + DEBOUNCE_MS;
+
+	if (digitalRead(PIN_ENC_DIR) == FORWARD_ENC_DIR) turning_state = ENCODER_SPIN_FWD;
+	else turning_state = ENCODER_SPIN_REV;
+
+	// To avoid the occasional reverse signal when one stopsfffrfrfrfffrrr turning
+	static EncoderState previous_turning_state = ENCODER_SPIN_FWD;
+	const uint_fast8_t NEEDED_COUNTS_TO_SWITCH = 2;
+	static uint_fast8_t opposite_counts = 0;
+
+	if (turning_state == previous_turning_state) {
+		opposite_counts = 0;
+		return;
+	}
+	
+	opposite_counts++;
+	if (opposite_counts < NEEDED_COUNTS_TO_SWITCH) turning_state = ENCODER_NO_INPUT;
+	else {
+		previous_turning_state = turning_state;
+		opposite_counts = 0;
+	}
+}
+
 // Made this function so we can adjust it easiler later like to use interrupts
-// This can only return 
+// This can only return one action per check 
 EncoderState check_encoder() {
 	static int last_button_state = LOW;
 	int current_button_state = digitalRead(PIN_ENC_BUT);
@@ -21,16 +58,10 @@ EncoderState check_encoder() {
 
 	if (button_changed && (current_button_state == ACTIVE_ENC_BUT)) return ENCODER_BUTTON_PRESS;
 
-	static int last_encoder_state = LOW;
-	int current_encoder_state = digitalRead(PIN_ENC_CLK);
-	bool encoder_changed = last_encoder_state != current_encoder_state;
-	last_encoder_state = current_button_state; 
-
-	// Only sending encoder updates on a falling edge
-	if (encoder_changed == false || current_encoder_state == HIGH) return ENCODER_NO_INPUT; 
-	
-	if (digitalRead(PIN_ENC_DIR) == FORWARD_ENC_DIR) return ENCODER_SPIN_FWD;
-	else return ENCODER_SPIN_REV;
+	// See if the encoder had anything happen
+	EncoderState return_val = turning_state;
+	turning_state = ENCODER_NO_INPUT;
+	return return_val;
 }
 
 TM1637 top_display(PIN_TOP_CLK, PIN_TOP_DIO);
@@ -45,9 +76,9 @@ void setup_display(TM1637* disp) {
 	delay(10);
 	int8_t data[] = {8, 8, 8, 8}; // Illuminate all segments for checking
 	disp->display(data);
-	delay(3000);
-	disp->clearDisplay();
 	delay(1000);
+	disp->clearDisplay();
+	delay(500);
 }
 
 void setup() {
@@ -60,6 +91,7 @@ void setup() {
 	else pinMode(PIN_ENC_BUT, INPUT_PULLUP);
 	pinMode(PIN_ENC_CLK, INPUT_PULLDOWN);
 	pinMode(PIN_ENC_DIR, INPUT_PULLDOWN);
+	attachInterrupt(PIN_ENC_CLK, encoder_interrupt, FALLING);
 }
 
 void loop() {
@@ -81,5 +113,5 @@ void loop() {
 		break;
 	}
 
-	delay(10);
+	delay(1);
 }
