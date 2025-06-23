@@ -14,7 +14,7 @@ typedef enum _EncoderState {
 TM1637 top_display(PIN_TOP_CLK, PIN_TOP_DIO);
 TM1637 bot_display(PIN_BOT_CLK, PIN_BOT_DIO);
 
-USBKeyboard keyboard_interface(true);
+// USBKeyboard keyboard_interface(true);
 
 volatile EncoderState turning_state = ENCODER_NO_INPUT;
 
@@ -65,8 +65,8 @@ EncoderState check_encoder() {
 }
 
 void send_character(char data) {
-	keyboard_interface.key_code(data);
-	Serial.println(data);
+	// keyboard_interface.key_code(data);
+	Serial.write(data);
 }
 
 void setup_display(TM1637* disp) {
