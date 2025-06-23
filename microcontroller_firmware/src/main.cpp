@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "TM1637.h"
 
-#include "pin_allocations.h"
+#include "pin_allocations_pico.h"
 
 typedef enum _EncoderState {
 	ENCODER_NO_INPUT = 0,
