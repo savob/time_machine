@@ -114,10 +114,9 @@ void loop() {
 	}
 
 	if (Serial.available()) {
-		uint32_t time_code = Serial.parseInt(SKIP_WHITESPACE);
-
-		uint16_t year_code = time_code / 10000;
-		uint16_t date_code = time_code % 10000;
+		// Direct binary transmission is the only way to get reasonable response time
+		uint16_t year_code = Serial.read() * 256 + Serial.read();
+		uint16_t date_code = Serial.read() * 256 + Serial.read();
 
 		top_display.displayNum(year_code);
 		bot_display.displayNum(date_code);
