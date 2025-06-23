@@ -64,10 +64,10 @@ EncoderState check_encoder() {
 	return return_val;
 }
 
-TM1637 top_display(PIN_TOP_CLK, PIN_TOP_DIO);
-TM1637 bot_display(PIN_BOT_CLK, PIN_BOT_DIO);
-
-USBKeyboard keyboard_interface(true);
+void send_character(char data) {
+	keyboard_interface.key_code(data);
+	Serial.println(data);
+}
 
 void setup_display(TM1637* disp) {
 	disp->set(7); // Max brightness
@@ -79,6 +79,8 @@ void setup_display(TM1637* disp) {
 	delay(1000);
 	disp->clearDisplay();
 	delay(500);
+
+	Serial.begin(115200); // Used to get data for displays 
 }
 
 void setup() {
@@ -96,22 +98,31 @@ void setup() {
 
 void loop() {
 	EncoderState state = check_encoder();
-	bot_display.displayNum(millis() % 10000);
-	top_display.displayNum(state);
-
+	
 	switch (state) {
-	case ENCODER_SPIN_FWD:
-		keyboard_interface.key_code('f');
+		case ENCODER_SPIN_FWD:
+		send_character('f');
 		break;
-	case ENCODER_BUTTON_PRESS:
-		keyboard_interface.key_code('p');
+		case ENCODER_BUTTON_PRESS:
+		send_character('p');
 		break;
-	case ENCODER_SPIN_REV:
-		keyboard_interface.key_code('r');
+		case ENCODER_SPIN_REV:
+		send_character('r');
 		break;
-	default:
+		default:
 		break;
 	}
 
+	if (Serial.available()) {
+		uint32_t time_code = Serial.parseInt(SKIP_WHITESPACE);
+
+		uint16_t year_code = time_code / 10000;
+		uint16_t date_code = time_code % 10000;
+
+		top_display.displayNum(year_code);
+		bot_display.displayNum(date_code);
+		if (date_code < 1000) bot_display.display(0, '0'); // Add leading zero for date codes if needed (e.g. _625)
+	}
+	
 	delay(1);
 }
