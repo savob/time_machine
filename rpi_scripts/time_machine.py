@@ -4,6 +4,7 @@ import cv2 # opencv - pip3 install opencv-python
 import random
 import sys
 import time
+import serial
 
 #-------------------------------------------------------------
 # Scan a folder tree (recursively) for jpg or png files
@@ -22,7 +23,7 @@ def scan_for_files(folder):
     picture_files.sort()
     return picture_files
 
-def check_for_config_file(config_file, def_delay, def_photo_folder):
+def check_for_config_file(config_file, def_delay, def_photo_folder, def_line):
     #
     #   Sample control file has four lines in KEY=VALUE format
     #   - delay in seconds
@@ -37,7 +38,7 @@ def check_for_config_file(config_file, def_delay, def_photo_folder):
     #PATH=/media/pi/photoframe
     #
 
-    result = [False, def_delay, def_photo_folder]
+    result = [False, def_delay, def_photo_folder, def_line]
     params_read = 0 # bitwise log of keywords found to verify we had a full and correct read
     # print('Reading config from ' + config_file)
 
@@ -54,11 +55,15 @@ def check_for_config_file(config_file, def_delay, def_photo_folder):
                 if line.startswith('PATH='):
                     result[2] = line[5:-1] # strip off new line at end
                     params_read = params_read | 2
+                if line.startswith('SERIAL='):
+                    line = line[7:]
+                    result[3] = line
+                    params_read = params_read | 4
     except:
         pass
 
     # print('Read configuration file results ', result)
-    if (params_read == 3):
+    if (params_read == 7):
         result[0] = True # read file properly, all bits set
     return result
 
@@ -67,6 +72,7 @@ def run_photo_frame(params):
     config_file_name    = params[0]
     delay               = params[1]
     photo_folder        = params[2]
+    serial_line         = params[3]
 
     # Force screen to remain on and not blank
     IS_WINDOWS = sys.platform.startswith('win') # 'win32' or 'linux2' or 'linux'
@@ -103,10 +109,11 @@ def run_photo_frame(params):
         if current_hour is not last_hour:
             last_hour = current_hour
 
-            result = check_for_config_file(config_file_name, delay, photo_folder)
+            result = check_for_config_file(config_file_name, delay, photo_folder, serial_line)
             if result[0] == True:
-                delay = result[1]
-                photo_folder = result[2]
+                delay           = result[1]
+                photo_folder    = result[2]
+                serial_line     = result[3]
             
             picture_file_list = scan_for_files(photo_folder)
             print(datetime.datetime.now(), 'Scan found', len(picture_file_list), 'files')
@@ -177,6 +184,7 @@ if __name__ == "__main__":
 
     successful_config_read = False
     config_file_name = "config_time_machine.ini" # default name to look for hourly in top level folder
+    serial_line = '/dev/serial0/'
     
     # search arg list for
     if len(sys.argv)>1:
@@ -184,12 +192,13 @@ if __name__ == "__main__":
 
     print("Reading config file: ", config_file_name)
 
-    result = check_for_config_file(config_file_name, delay_s, photo_folder)
+    result = check_for_config_file(config_file_name, delay_s, photo_folder, serial_line)
     if result[0] == True: # Check for successfull read of config file
         delay_s = result[1]
         photo_folder = result[2]
+        serial_line = result[3]
         successful_config_read = True
-        print("Config file read: ", delay_s, photo_folder)
+        print("Config file read: ", delay_s, photo_folder, serial_line)
 
     time.sleep(3) # wait just a bit to read messages if any
 
@@ -198,5 +207,5 @@ if __name__ == "__main__":
         exit()
     else:
         # and then, let's get this show on the road
-        params=[config_file_name, delay_s, photo_folder]
+        params=[config_file_name, delay_s, photo_folder, serial_line]
         run_photo_frame(params)
