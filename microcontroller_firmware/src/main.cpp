@@ -113,7 +113,7 @@ void loop() {
 		break;
 	}
 
-	if (Serial.available()) {
+	if (Serial.available() >= 4) {
 		// Direct binary transmission is the only way to get reasonable response time
 		uint16_t year_code = Serial.read() * 256 + Serial.read();
 		uint16_t date_code = Serial.read() * 256 + Serial.read();
@@ -121,6 +121,8 @@ void loop() {
 		top_display.displayNum(year_code);
 		bot_display.displayNum(date_code);
 		if (date_code < 1000) bot_display.display(0, '0'); // Add leading zero for date codes if needed (e.g. _625)
+	
+		while (Serial.available()) Serial.read(); // Dump extra buffer
 	}
 	
 	delay(1);
