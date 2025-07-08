@@ -6,6 +6,11 @@ import sys
 import time
 from remote_interface import remote_control
 
+# Command characters
+INCREMENT_PHOTO = 'f'
+DECREMENT_PHOTO = 'r'
+RANDOM_PHOTO = 'p'
+
 #-------------------------------------------------------------
 # Scan a folder tree (recursively) for jpg or png files
 def scan_for_files(folder):
@@ -115,8 +120,15 @@ def run_photo_frame(params):
             print(datetime.datetime.now(), 'Scan found', len(picture_file_list), 'files')
 
         # Select new photo (constrained to list)
-        current_index = current_index + 1 # Just increment for now
-        print(hand_held.read())
+        command = hand_held.read()
+        if len(command) > 0:
+            command = str(command)
+            if command.count(RANDOM_PHOTO) > 0:
+                current_index = random.randint(0, len(picture_file_list)-1)
+            else:
+                change = command.count(INCREMENT_PHOTO) - command.count(DECREMENT_PHOTO)
+                current_index = current_index + change
+
         current_index = min([len(picture_file_list)-1, current_index])
         current_index = max([0, current_index])
         file_name = picture_file_list[current_index]
@@ -163,7 +175,7 @@ def run_photo_frame(params):
 
         # Show final image while waiting for a key to potentially be pressed for exit
         cv2.imshow(cv2_frame, bordered_image)
-        k = cv2.waitKey(int(delay * 1000)) & 0xff
+        k = cv2.waitKey(int(25)) & 0xff
 
         if k != 255: # Any key pressed
             done = True
