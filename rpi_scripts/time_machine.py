@@ -4,7 +4,7 @@ import cv2 # opencv - pip3 install opencv-python
 import random
 import sys
 import time
-import serial
+from remote_interface import remote_control
 
 #-------------------------------------------------------------
 # Scan a folder tree (recursively) for jpg or png files
@@ -23,7 +23,7 @@ def scan_for_files(folder):
     picture_files.sort()
     return picture_files
 
-def check_for_config_file(config_file, def_delay, def_photo_folder, def_line):
+def check_for_config_file(config_file, def_delay, def_photo_folder):
     #
     #   Sample control file has four lines in KEY=VALUE format
     #   - delay in seconds
@@ -38,7 +38,7 @@ def check_for_config_file(config_file, def_delay, def_photo_folder, def_line):
     #PATH=/media/pi/photoframe
     #
 
-    result = [False, def_delay, def_photo_folder, def_line]
+    result = [False, def_delay, def_photo_folder]
     params_read = 0 # bitwise log of keywords found to verify we had a full and correct read
     # print('Reading config from ' + config_file)
 
@@ -55,15 +55,11 @@ def check_for_config_file(config_file, def_delay, def_photo_folder, def_line):
                 if line.startswith('PATH='):
                     result[2] = line[5:-1] # strip off new line at end
                     params_read = params_read | 2
-                if line.startswith('SERIAL='):
-                    line = line[7:]
-                    result[3] = line
-                    params_read = params_read | 4
     except:
         pass
 
     # print('Read configuration file results ', result)
-    if (params_read == 7):
+    if (params_read == 3):
         result[0] = True # read file properly, all bits set
     return result
 
@@ -72,7 +68,6 @@ def run_photo_frame(params):
     config_file_name    = params[0]
     delay               = params[1]
     photo_folder        = params[2]
-    serial_line         = params[3]
 
     # Force screen to remain on and not blank
     IS_WINDOWS = sys.platform.startswith('win') # 'win32' or 'linux2' or 'linux'
@@ -101,6 +96,8 @@ def run_photo_frame(params):
     current_index   = 0     # Photo index to use
     done            = False
     last_hour       = -1    # Force a reset on first iteration (for code testing)
+
+    hand_held = remote_control()
     
     while not done:
 
@@ -109,19 +106,19 @@ def run_photo_frame(params):
         if current_hour is not last_hour:
             last_hour = current_hour
 
-            result = check_for_config_file(config_file_name, delay, photo_folder, serial_line)
+            result = check_for_config_file(config_file_name, delay, photo_folder)
             if result[0] == True:
                 delay           = result[1]
                 photo_folder    = result[2]
-                serial_line     = result[3]
             
             picture_file_list = scan_for_files(photo_folder)
             print(datetime.datetime.now(), 'Scan found', len(picture_file_list), 'files')
 
-        # Select new photo
+        # Select new photo (constrained to list)
         current_index = current_index + 1 # Just increment for now
-        if current_index >= len(picture_file_list):
-            current_index = 0 
+        print(hand_held.read())
+        current_index = min([len(picture_file_list)-1, current_index])
+        current_index = max([0, current_index])
         file_name = picture_file_list[current_index]
 
         got_image=False
@@ -139,6 +136,7 @@ def run_photo_frame(params):
         date_and_time = os.path.basename(file_name)
         date_stamp = int(date_and_time[0:8])
         time_stamp = int(date_and_time[9:15])
+        hand_held.send(int(date_stamp / 10000), int(date_stamp % 10000))
 
         #-- now, maybe resize image so it shows up well without changing the aspect ratio
         #   add a border if the aspect ratio is different than the screen
@@ -184,7 +182,6 @@ if __name__ == "__main__":
 
     successful_config_read = False
     config_file_name = "config_time_machine.ini" # default name to look for hourly in top level folder
-    serial_line = '/dev/serial0/'
     
     # search arg list for
     if len(sys.argv)>1:
@@ -192,13 +189,12 @@ if __name__ == "__main__":
 
     print("Reading config file: ", config_file_name)
 
-    result = check_for_config_file(config_file_name, delay_s, photo_folder, serial_line)
+    result = check_for_config_file(config_file_name, delay_s, photo_folder)
     if result[0] == True: # Check for successfull read of config file
         delay_s = result[1]
         photo_folder = result[2]
-        serial_line = result[3]
         successful_config_read = True
-        print("Config file read: ", delay_s, photo_folder, serial_line)
+        print("Config file read: ", delay_s, photo_folder)
 
     time.sleep(3) # wait just a bit to read messages if any
 
@@ -207,5 +203,5 @@ if __name__ == "__main__":
         exit()
     else:
         # and then, let's get this show on the road
-        params=[config_file_name, delay_s, photo_folder, serial_line]
+        params=[config_file_name, delay_s, photo_folder]
         run_photo_frame(params)
